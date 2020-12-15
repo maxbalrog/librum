@@ -1,5 +1,8 @@
 # librum - Pipeline for booktitle detection
 
+## **Problem statement**
+
+## **Used pipeline**
 
 
 ## **Literature**
