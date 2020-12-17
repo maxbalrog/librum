@@ -2,8 +2,17 @@
 
 ## **Problem statement**
 
+Managing and finding books in large collections often leads to tedious manual work. In addition, sometimes books may be missing or misplaced.
+We can build a following algorithm:
+* Given a bookshelf photo, it segments different book spines.
+* On each book spine it locates the title (and splits in into separate characters).
+* Text recognition algorithm transfers title photo into actual text which could be used to build a book database (alternatively, to find a certain book).
+
+
 ## **Used pipeline**
 
+Tesseract OCR was used with Russian language flag.
+For training a cyrillic letters classifier we used dataset: [CoMNIST](https://github.com/GregVial/CoMNIST).
 
 ## **Literature**
 1.  [Smart Library: Identifying Books in a Library using Richly Supervised Deep
