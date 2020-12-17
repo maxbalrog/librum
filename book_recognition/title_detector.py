@@ -3,38 +3,13 @@ import pytesseract
 from .book_segmentation import *
 from .comnist_train import *
 
-# class Model(nn.Module):
-#     def __init__(self, n_classes=34, n_filters=15):
-#         super(Model, self).__init__()
-#         self.conv1 = nn.Conv2d(1, n_filters, 5, padding=0)
-#         self.conv2 = nn.Conv2d(n_filters, n_filters*2, 5, padding=0)
-#         self.conv3 = nn.Conv2d(n_filters*2, n_filters*4, 5, padding=0)
-#         self.pool = nn.MaxPool2d(2, 2)
-#         self.fc1 = nn.Linear(n_filters*4 * 4 * 4, 160)
-#         self.fc2 = nn.Linear(160, 100)
-#         self.fc3 = nn.Linear(100, n_classes)
-#
-#         self.relu = nn.ReLU()
-#         self.dropout = nn.Dropout()
-#
-#     def forward(self, x):
-#         bs, _, _, _ = x.shape
-#         x = self.pool(self.relu(self.conv1(x)))
-#         x = self.pool(self.relu(self.conv2(x)))
-#         x = self.pool(self.relu(self.conv3(x)))
-#         x = x.view(bs, -1)
-#         x = self.dropout(x)
-#         x = self.relu(self.fc1(x))
-#         x = self.relu(self.fc2(x))
-#         x = self.fc3(x)
-#
-#         return x
 
 def find_edges(img, sigma=1, thr=20):
     imgray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edges = feature.canny(imgray, sigma=1, low_threshold=20)
 
     return edges
+
 
 def sort_contours(img, contours, area_thr=50, width_thr=10, height_thr=40):
     h,w = img.shape[:2]
@@ -48,7 +23,6 @@ def sort_contours(img, contours, area_thr=50, width_thr=10, height_thr=40):
 
             x, y, w1, h1 = cv2.boundingRect(cnt)
             bound_rect_area = w1 * h1
-    #         cv.rectangle(img,(x,y),(x+w,y+h),(0,255,0),2)
 
             if bound_rect_area > w*h//area_thr:
                 continue
@@ -64,6 +38,7 @@ def sort_contours(img, contours, area_thr=50, width_thr=10, height_thr=40):
 
     return contours_let
 
+
 def find_max(flat, relax=5):
     i = 0
     j = len(flat) - 1
@@ -71,7 +46,6 @@ def find_max(flat, relax=5):
     i += 1
     j -= 1
 
-    # fl1, fl2 = True, True
     idx_left, idx_right = 0, len(flat)-1
 
     while i<=len(flat)//2:
@@ -97,6 +71,7 @@ def find_max(flat, relax=5):
 
     return idx_left, idx_right
 
+
 def find_title_region(image, kernlen=5, std=1):
     img = image.copy().astype(np.uint8)
     h,w = img.shape[:2]
@@ -111,7 +86,6 @@ def find_title_region(image, kernlen=5, std=1):
     flat = np.zeros(w)
     for cnt in contours_let:
         x, y, w1, h1 = cv2.boundingRect(cnt)
-#         cv2.rectangle(img1,(x,y),(x+w1,y+h1),(0,255,0),2)
         flat[x] += 1
         flat[x+w1] += 1
 
@@ -119,9 +93,9 @@ def find_title_region(image, kernlen=5, std=1):
     flat = np.convolve(flat, kernel)
 
     idx_left, idx_right = find_max(flat, relax=15)
-#     print(idx_left, idx_right)
 
     return img[:, idx_left:idx_right]
+
 
 def single_words(img, thr=60):
     img = img.astype(np.uint8)
@@ -133,21 +107,18 @@ def single_words(img, thr=60):
     kernel = np.ones((5,3))
     mask = cv2.dilate(edges.astype(np.uint8), kernel)
 
-    # plot_img(mask)
-
     contours_words, hierarchy = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     img1 = img_title.copy()
     words = []
     for cnt in contours_words:
-#         M = cv2.moments(cnt)
         x, y, w1, h1 = cv2.boundingRect(cnt)
         if w1*h1 > h*w//thr:
             cv2.rectangle(img1,(x,y),(x+w1,y+h1),(0,255,0),2)
             words.append(img_title[y:y+h1,x:x+w1])
-    # plot_img(img1)
 
     return words
+
 
 def single_letters(word, ups_factor=3, sigma=1, thr=10, area_thr=10):
     h,w = word.shape[:2]
@@ -156,22 +127,18 @@ def single_letters(word, ups_factor=3, sigma=1, thr=10, area_thr=10):
     kernel = np.ones((3,3))
     edges = cv2.dilate(edges.astype(np.uint8), kernel, iterations=1)
 
-    # plot_img(edges)
-
     contour_letters, hierarchy = cv2.findContours(edges.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     letters = []
     img1 = word_ups.copy()
     for cnt in contour_letters:
-#         M = cv2.moments(cnt)
         x, y, w1, h1 = cv2.boundingRect(cnt)
         if w1*h1 > h*w//area_thr:
             cv2.rectangle(img1,(x,y),(x+w1,y+h1),(0,255,0),1)
             letters.append(word_ups[y:y+h1,x:x+w1])
 
-    # plot_img(img1)
-
     return letters
+
 
 def image2letters(img):
     words = single_words(img)
@@ -211,7 +178,6 @@ def filter_cnts(contours, mask):
             fl2 = (w0 > int(0.5 * w)) & (ratio > 5)
             fl3 = area < (w/35)**2
             fl4 = abs(area - h0*w0) < area*0.1
-#             fl4 = (0.4 < ratio < 1.7) & (solidity > 0.9)
 
             if fl1 | fl2 | fl3 | fl4:
                 cv2.drawContours(mask1, [cnt], 0, 0, -1)
@@ -219,6 +185,7 @@ def filter_cnts(contours, mask):
                 contours_filtered.append(cnt)
 
     return contours_filtered, mask1
+
 
 def book2mask(book, window_size=40, diff_thr=50, gap=5, verbose=False, return_windows=False):
     h,w = book.shape[:2]
@@ -275,6 +242,7 @@ def book2mask(book, window_size=40, diff_thr=50, gap=5, verbose=False, return_wi
     else:
         return book_mask, mask, contours_filtered
 
+
 def find_cnt_dist(cnt1, cnt2, angle=False):
     n_pts1 = cnt1.shape[0]
     n_pts2 = cnt2.shape[0]
@@ -319,6 +287,7 @@ def find_cnt_dist(cnt1, cnt2, angle=False):
     else:
         return min_dist
 
+
 def find_neib(cnt, neibs):
     min_dist = 10000
     idx = -1
@@ -333,6 +302,7 @@ def find_neib(cnt, neibs):
 
     return neib, neibs, min_dist
 
+
 def check_relax(x,y,relax):
     if (y-relax) > 0:
         y_start = y - relax
@@ -344,6 +314,7 @@ def check_relax(x,y,relax):
         x_start = x
 
     return x_start, y_start
+
 
 def check_orientation(words):
     if len(words) > 1:
@@ -367,6 +338,7 @@ def check_orientation(words):
         fl_rot = False
 
     return fl_rot
+
 
 def get_word_mask(words, img, mask, relax=0):
     words_mask = []
@@ -483,8 +455,8 @@ def connect_components(words):
         word_stats = calc_stats(words_merged)
         words_comb = []
 
-
     return words_merged
+
 
 def cnt2words(mask, img, contours, thr=1.6, relax=3, connect=False, verbose=False):
     h,w = mask.shape
@@ -567,12 +539,13 @@ def tesseract_predict(img, lang='rus'):
     return pred
 
 
-def book_predict(book_img, labels, model_path='comnist_cls.pth'):
-    book_pred_tes = tesseract_predict(book_img)
-
-    book_img = find_title_region(book_img)
-    book_mask, mask, contours_filtered = book2mask(book_img, window_size=30)
-    words_mask, words_connected_mask = cnt2words(mask, book_img, contours_filtered, verbose=True)
+def book_predict(book_img, labels, model_path='comnist_cls.pth', mask=False):
+    if not mask:
+        book_img = find_title_region(book_img)
+        book_mask, mask, contours_filtered = book2mask(book_img, window_size=30)
+        words_mask, words_connected_mask = cnt2words(mask, book_img, contours_filtered, verbose=True)
+    else:
+        words_mask, words_connected_mask = book_img
 
     word_pred_tes = []
     for word,mask in zip(words_connected_mask['img'], words_connected_mask['mask']):
@@ -593,10 +566,10 @@ def book_predict(book_img, labels, model_path='comnist_cls.pth'):
             pred_cls += labels[idx_pred]
         book_pred_cls.append(pred_cls)
 
-    return (book_pred_tes, word_pred_tes), book_pred_cls
+    return word_pred_tes, book_pred_cls
 
 
-def read_title(img, model_path='comnist_cls_2.pth', verbose=False):
+def read_title(img, idx, model_path='comnist_cls.pth', verbose=False):
     if np.max(img.shape) >= 1000:
         resc_factor = np.max(img.shape) // 1000
     else:
@@ -613,10 +586,9 @@ def read_title(img, model_path='comnist_cls_2.pth', verbose=False):
             plt.axis('off')
         plt.show()
 
-    idx = -2
     book_img = books[idx]
 
     labels = '| а б в г д е ж з и к л м н о п р с т у ф х ц ч ш щ ъ ы ь э ю я'.split()
-    (book_pred_tes, word_pred_tes), book_pred_cls = book_predict(book_img, labels, model_path)
+    word_pred_tes, book_pred_cls = book_predict(book_img, labels, model_path)
 
-    return (book_pred_tes, word_pred_tes), book_pred_cls
+    return word_pred_tes, book_pred_cls
