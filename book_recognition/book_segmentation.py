@@ -27,6 +27,19 @@ def plot_img(img):
     plt.axis('off')
     plt.show()
 
+def plot_lines(img, lines):
+    img1 = img.copy()
+    h,w = img1.shape[:2]
+
+    for line in lines:
+        rho, theta = line
+        a, b = np.cos(theta), np.sin(theta)
+        x0, y0 = a * rho, b * rho
+        pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
+        pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
+        cv2.line(img1, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
+
+    return img1
 
 def preprocess_img(img, resc_factor=3, kernel=(5,5)):
     h, w, _ = img.shape
@@ -56,15 +69,20 @@ def filter_rho(rho, theta, thr_dist=40):
     return lines_new
 
 
-def filter_lines(rho, theta, n_bins=100, thr_dist=40, thr_angle=4):
+def filter_lines(rho, theta, n_bins=100, thr_dist=40, thr_angle=4, plot_hist=False):
     rho_ = np.array(rho)
     theta_ = np.array(theta)
     theta_ = theta_ / np.pi * 180
 
     #find dominant direction
-    n, bins, _ = plt.hist(theta_, n_bins);
+    if plot_hist:
+        # print('Histogram of dominant Hough line angle:')
+        n, bins, _ = plt.hist(theta_, n_bins)
+    else:
+        n, bins, _ = plt.hist(theta_, n_bins)
+        plt.close()
     dtheta = bins[1] - bins[0]
-    print('dtheta: {}'.format(dtheta))
+    # print('dtheta: {}'.format(dtheta))
 
     n_conv = np.zeros_like(n)
     for i in range(1,n_bins-1):
@@ -73,7 +91,7 @@ def filter_lines(rho, theta, n_bins=100, thr_dist=40, thr_angle=4):
 
     idx_max = np.argmax(n_conv)
     theta_max = (bins[idx_max] + bins[idx_max+1]) / 2
-    print('theta_max: {}'.format(theta_max))
+    # print('theta_max: {}'.format(theta_max))
 
     #filter out other lines
     idx_theta = (abs(theta_-theta_max) < thr_angle) | (abs(180-theta_-theta_max) < thr_angle)
@@ -85,7 +103,7 @@ def filter_lines(rho, theta, n_bins=100, thr_dist=40, thr_angle=4):
 
     if 90-theta_max < 0:
         theta_max = 180 - theta_max
-    print(theta_max)
+    print('Theta max: {}'.format(theta_max))
 
     return lines, theta_max
 
@@ -106,12 +124,12 @@ def find_lines(img, sigma=3, thr=20):
     return rho_list, theta_list
 
 
-def rotate_img(img, thr=20, resc_factor=3, kernel=(5,5)):
+def rotate_img(img, thr=20, resc_factor=3, kernel=(5,5), plot_hist=False):
     img_resc, imgray = preprocess_img(img, resc_factor=resc_factor, kernel=kernel)
 
     rho_list, theta_list = find_lines(imgray, thr=thr)
 
-    lines_filtered, theta_max = filter_lines(rho_list, theta_list)
+    lines_filtered, theta_max = filter_lines(rho_list, theta_list, plot_hist=plot_hist)
 
     #rotate image
     img_rotated = rotate(img_resc.astype(float), -theta_max)
@@ -121,7 +139,7 @@ def rotate_img(img, thr=20, resc_factor=3, kernel=(5,5)):
     rho, theta = find_lines(img_rotated_gray, thr=thr)
 
     thr_dist = img.shape[1] // 30
-    lines_rotated, theta_rot_max = filter_lines(rho, theta, thr_dist)
+    lines_rotated, theta_rot_max = filter_lines(rho, theta, thr_dist, plot_hist=plot_hist)
 
     return img_resc, img_rotated, lines_filtered, lines_rotated
 

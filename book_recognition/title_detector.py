@@ -1,4 +1,34 @@
+import pytesseract
+
 from .book_segmentation import *
+from .comnist_train import *
+
+# class Model(nn.Module):
+#     def __init__(self, n_classes=34, n_filters=15):
+#         super(Model, self).__init__()
+#         self.conv1 = nn.Conv2d(1, n_filters, 5, padding=0)
+#         self.conv2 = nn.Conv2d(n_filters, n_filters*2, 5, padding=0)
+#         self.conv3 = nn.Conv2d(n_filters*2, n_filters*4, 5, padding=0)
+#         self.pool = nn.MaxPool2d(2, 2)
+#         self.fc1 = nn.Linear(n_filters*4 * 4 * 4, 160)
+#         self.fc2 = nn.Linear(160, 100)
+#         self.fc3 = nn.Linear(100, n_classes)
+#
+#         self.relu = nn.ReLU()
+#         self.dropout = nn.Dropout()
+#
+#     def forward(self, x):
+#         bs, _, _, _ = x.shape
+#         x = self.pool(self.relu(self.conv1(x)))
+#         x = self.pool(self.relu(self.conv2(x)))
+#         x = self.pool(self.relu(self.conv3(x)))
+#         x = x.view(bs, -1)
+#         x = self.dropout(x)
+#         x = self.relu(self.fc1(x))
+#         x = self.relu(self.fc2(x))
+#         x = self.fc3(x)
+#
+#         return x
 
 def find_edges(img, sigma=1, thr=20):
     imgray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -103,7 +133,7 @@ def single_words(img, thr=60):
     kernel = np.ones((5,3))
     mask = cv2.dilate(edges.astype(np.uint8), kernel)
 
-    plot_img(mask)
+    # plot_img(mask)
 
     contours_words, hierarchy = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -115,7 +145,7 @@ def single_words(img, thr=60):
         if w1*h1 > h*w//thr:
             cv2.rectangle(img1,(x,y),(x+w1,y+h1),(0,255,0),2)
             words.append(img_title[y:y+h1,x:x+w1])
-    plot_img(img1)
+    # plot_img(img1)
 
     return words
 
@@ -126,7 +156,7 @@ def single_letters(word, ups_factor=3, sigma=1, thr=10, area_thr=10):
     kernel = np.ones((3,3))
     edges = cv2.dilate(edges.astype(np.uint8), kernel, iterations=1)
 
-    plot_img(edges)
+    # plot_img(edges)
 
     contour_letters, hierarchy = cv2.findContours(edges.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -139,7 +169,7 @@ def single_letters(word, ups_factor=3, sigma=1, thr=10, area_thr=10):
             cv2.rectangle(img1,(x,y),(x+w1,y+h1),(0,255,0),1)
             letters.append(word_ups[y:y+h1,x:x+w1])
 
-    plot_img(img1)
+    # plot_img(img1)
 
     return letters
 
@@ -190,15 +220,17 @@ def filter_cnts(contours, mask):
 
     return contours_filtered, mask1
 
-def book2mask(book, window_size=40, diff_thr=50, gap=5, verbose=False):
+def book2mask(book, window_size=40, diff_thr=50, gap=5, verbose=False, return_windows=False):
     h,w = book.shape[:2]
     imgray = cv2.cvtColor(book, cv2.COLOR_BGR2GRAY)
 
     n_windows = h // window_size
+    windows = []
 
     book_mask = np.zeros_like(imgray)
 
     for i in range(n_windows):
+        window_img = book[window_size*i:window_size*(i+1)]
         window = imgray[window_size*i:window_size*(i+1)]
         if np.max(window) - np.min(window) > diff_thr:
             ret, thr = cv2.threshold(window, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
@@ -222,6 +254,7 @@ def book2mask(book, window_size=40, diff_thr=50, gap=5, verbose=False):
         else:
             thr = np.zeros_like(window, dtype=np.uint8)
 
+        windows.append((window_img,thr))
         book_mask[window_size*i:window_size*(i+1)] = thr
 
         if verbose:
@@ -237,7 +270,10 @@ def book2mask(book, window_size=40, diff_thr=50, gap=5, verbose=False):
         contours, hierarchy = cv2.findContours(book_mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours_filtered, mask = filter_cnts(contours, book_mask)
 
-    return book_mask, mask, contours_filtered
+    if return_windows:
+        return book_mask, mask, contours_filtered, windows
+    else:
+        return book_mask, mask, contours_filtered
 
 def find_cnt_dist(cnt1, cnt2, angle=False):
     n_pts1 = cnt1.shape[0]
@@ -391,7 +427,7 @@ def calc_stats(words):
         elif n_symb == 2:
             d, alpha = find_cnt_dist(word[0], word[-1], angle=True)
             stats['dist_mean'] = d
-            stats['dist_std'] = d*0.5
+            stats['dist_std'] = d*0.7
             stats['angle_mean'] = alpha
 
         word_stats.append(stats)
@@ -411,6 +447,7 @@ def connect_components(words):
             word1 = words_merged[i]
             word2 = words_merged[i+1]
             d, alpha = find_cnt_dist(word1[-1], word2[0], angle=True)
+            fl = False
 
             if (len(word1) >= 2) and (len(word2) >= 2):
                 m1, std1 = word_stats[i]['dist_mean'], word_stats[i]['dist_std']
@@ -449,7 +486,7 @@ def connect_components(words):
 
     return words_merged
 
-def cnt2words(mask, img, contours, thr=1.6, relax=3, verbose=False):
+def cnt2words(mask, img, contours, thr=1.6, relax=3, connect=False, verbose=False):
     h,w = mask.shape
 
     words = []
@@ -501,14 +538,15 @@ def cnt2words(mask, img, contours, thr=1.6, relax=3, verbose=False):
             word.append(path[i])
             fl = False
 
-    if (not fl) and (dist[-1] > dist[-2]*thr):
+    if (not fl) and (dists[-1] > dists[-2]*thr):
         word.append(path[i+1])
         words.append(word)
     else:
         words.append(word)
         words.append([path[i+1]])
 
-    words = connect_components(words)
+    if connect:
+        words = connect_components(words)
 
     words_mask, words_connected_mask = get_word_mask(words, img, mask, relax=relax)
 
