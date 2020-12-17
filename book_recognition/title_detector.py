@@ -66,7 +66,10 @@ def find_max(flat, relax=5):
             right_max = flat[j+1]
         j -= 1
 
-    idx_left -= relax
+    if idx_left - relax > 0:
+        idx_left -= relax
+    else:
+        idx_left = 0
     idx_right += relax + 1
 
     return idx_left, idx_right
