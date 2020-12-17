@@ -1,4 +1,4 @@
-import book_segmentation
+from .book_segmentation import *
 
 def find_edges(img, sigma=1, thr=20):
     imgray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
