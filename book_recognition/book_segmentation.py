@@ -1,19 +1,3 @@
-import numpy as np
-import matplotlib.pyplot as plt
-
-import cv2
-
-import skimage
-from skimage import feature
-from skimage.transform import rotate
-from skimage import transform
-
-import tensorflow as tf
-import torch
-
-import glob
-import os
-
 def plot_img(img):
     is_gray = len(img.shape) == 2
     plt.figure(dpi=200)
