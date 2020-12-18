@@ -11,6 +11,9 @@ We can build a following algorithm:
 
 ## **Used pipeline**
 
+Good examples of text localization:
+![](images.00.png)
+
 Tesseract OCR was used with Russian language flag.
 For training a cyrillic letters classifier we used dataset: [CoMNIST](https://github.com/GregVial/CoMNIST).
 
